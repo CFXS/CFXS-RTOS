@@ -21,18 +21,17 @@ namespace CFXS::RTOS {
     ////////////////////////////////////////////////////////
     static constexpr auto MAX_THREAD_COUNT = 8;
     ////////////////////////////////////////////////////////
-    static Thread* volatile s_Threads[MAX_THREAD_COUNT] = {};
-    static int s_ThreadCount                            = 0;
-    Thread* volatile s_CurrentThread                    = nullptr;
-    Thread* volatile s_NextThread                       = nullptr;
+    Thread* volatile s_LastThread    = nullptr;
+    Thread* volatile s_CurrentThread = nullptr;
+    Thread* volatile s_NextThread    = nullptr;
     ////////////////////////////////////////////////////////
 
     // Process scheduler event
     void Scheduler::SchedulerEvent() {
-        static int s_ThreadIndex = 0;
-        if (s_ThreadCount) {
-            s_NextThread = s_Threads[s_ThreadIndex++ % s_ThreadCount];
-        }
+        if (!s_NextThread)
+            s_NextThread = s_LastThread ? s_LastThread->LL_GetNextThread() : nullptr;
+        else
+            s_NextThread = s_NextThread->LL_GetNextThread();
 
         if (s_NextThread && s_NextThread != s_CurrentThread) {
             *(size_t volatile*)0xE000ED04 = (1 << 28);
@@ -61,13 +60,18 @@ namespace CFXS::RTOS {
     Thread* Scheduler::CreateThread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize) {
         auto thread = new Thread(label, func, stackAddr, stackSize);
 
-        for (int i = 0; i < MAX_THREAD_COUNT; i++) {
-            if (!s_Threads[i]) {
-                s_Threads[i] = thread;
-                s_ThreadCount++;
-                break;
-            }
+        asm volatile("cpsid i");
+        if (!s_LastThread) {
+            // Initialize circular linked list
+            s_LastThread = thread;
+            s_LastThread->LL_SetNextThread(thread);
+        } else {
+            // insert at end
+            thread->LL_SetNextThread(s_LastThread->LL_GetNextThread());
+            s_LastThread->LL_SetNextThread(thread);
+            s_LastThread = thread;
         }
+        asm volatile("cpsie i");
 
         return thread;
     }

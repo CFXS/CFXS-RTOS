@@ -22,19 +22,44 @@
 
 namespace CFXS::RTOS {
 
-    class Thread : public Impl::Thread {
+    class Thread;
+    extern void _Impl_Thread_InitializeStackFrame(Thread* thread);
+
+    class Thread {
         friend class Scheduler;
+        friend void _Impl_InitializeStackFrame(Thread* thread);
 
     public:
-        void SetLabel(const char* newLabel);
-        const char* GetLabel() const;
+        __always_inline size_t GetStackSize() const { return m_StackSize; }
+        __always_inline void* GetStackBottomAddress() { return m_StackEndAddress; }
+        __always_inline void* GetStackTopAddress() { return (void*)((size_t)GetStackBottomAddress() + GetStackSize()); }
+
+        __always_inline void SetSP(void* addr) { m_ThreadSP = addr; }
+        __always_inline void* GetSP() const { return m_ThreadSP; }
+
+        __always_inline void SetLabel(const char* newLabel) { m_Label = newLabel; };
+        __always_inline const char* GetLabel() const { return m_Label; };
+
+        __always_inline void* GetThreadFunctionAddress() const { return reinterpret_cast<void*>(m_ThreadFunction); }
+
+        /// Set next thread in linked list
+        __always_inline void LL_SetNextThread(Thread* thread) { m_ll_NextThread = thread; }
+
+        /// Get next thread in linked list
+        __always_inline Thread* LL_GetNextThread() const { return m_ll_NextThread; }
 
     private:
-        Thread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize) :
-            Impl::Thread(func, stackAddr, stackSize), m_Label(label) {}
+        Thread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize);
+
+        Thread* m_ll_NextThread = nullptr;
 
         const char* m_Label;
         bool m_Running = false;
+
+        void* m_ThreadSP;
+        ThreadFunction m_ThreadFunction;
+        void* m_StackEndAddress;
+        size_t m_StackSize;
     };
 
 } // namespace CFXS::RTOS
