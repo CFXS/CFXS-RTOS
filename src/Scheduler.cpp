@@ -6,14 +6,16 @@
 namespace CFXS::RTOS {
 
     // temp
-    __attribute__((always_inline)) uint32_t __get_SP(void) {
+    __always_inline uint32_t __get_SP(void) {
         register uint32_t result;
 
         asm volatile("MRS %0, msp\n" : "=r"(result));
         return (result);
     }
 
-    __attribute__((always_inline)) void __set_SP(uint32_t topOfMainStack) { asm volatile("MSR msp, %0\n" : : "r"(topOfMainStack) : "sp"); }
+    __always_inline void __set_SP(uint32_t topOfMainStack) {
+        asm volatile("MSR msp, %0\n" : : "r"(topOfMainStack) : "sp"); //
+    }
 
     ////////////////////////////////////////////////////////
     static constexpr auto MAX_THREAD_COUNT = 8;
@@ -25,13 +27,16 @@ namespace CFXS::RTOS {
 
     // Process scheduler event
     void Scheduler::SchedulerEvent() {
-        if (s_NextThread != s_CurrentThread) {
+        static int tid = 0;
+        s_NextThread   = s_Threads[(tid++) & 1];
+
+        if (s_NextThread && s_NextThread != s_CurrentThread) {
             *(size_t volatile*)0xE000ED04 = (1 << 28);
         }
     }
 
     // Process context switch event
-    __attribute__((naked)) void Scheduler::ContextEvent() {
+    __naked void Scheduler::ContextEvent() {
         asm volatile("cpsid i");
         if (s_CurrentThread) {
             asm volatile("push {r4-r11}");
@@ -53,9 +58,10 @@ namespace CFXS::RTOS {
         auto thread = new Thread(label, func, stackAddr, stackSize);
 
         for (int i = 0; i < MAX_THREAD_COUNT; i++) {
-            if (!s_Threads[i])
+            if (!s_Threads[i]) {
                 s_Threads[i] = thread;
-            break;
+                break;
+            }
         }
 
         return thread;
