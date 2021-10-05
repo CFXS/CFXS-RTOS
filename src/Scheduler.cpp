@@ -12,23 +12,27 @@ namespace CFXS::RTOS {
         asm volatile("MRS %0, msp\n" : "=r"(result));
         return (result);
     }
-
+#pragma GCC diagnostic ignored "-Wdeprecated"
     __always_inline void __set_SP(uint32_t topOfMainStack) {
         asm volatile("MSR msp, %0\n" : : "r"(topOfMainStack) : "sp"); //
     }
+#pragma GCC diagnostic pop
 
     ////////////////////////////////////////////////////////
     static constexpr auto MAX_THREAD_COUNT = 8;
     ////////////////////////////////////////////////////////
     static Thread* volatile s_Threads[MAX_THREAD_COUNT] = {};
+    static int s_ThreadCount                            = 0;
     Thread* volatile s_CurrentThread                    = nullptr;
     Thread* volatile s_NextThread                       = nullptr;
     ////////////////////////////////////////////////////////
 
     // Process scheduler event
     void Scheduler::SchedulerEvent() {
-        static int tid = 0;
-        s_NextThread   = s_Threads[(tid++) & 1];
+        static int s_ThreadIndex = 0;
+        if (s_ThreadCount) {
+            s_NextThread = s_Threads[s_ThreadIndex++ % s_ThreadCount];
+        }
 
         if (s_NextThread && s_NextThread != s_CurrentThread) {
             *(size_t volatile*)0xE000ED04 = (1 << 28);
@@ -60,6 +64,7 @@ namespace CFXS::RTOS {
         for (int i = 0; i < MAX_THREAD_COUNT; i++) {
             if (!s_Threads[i]) {
                 s_Threads[i] = thread;
+                s_ThreadCount++;
                 break;
             }
         }
