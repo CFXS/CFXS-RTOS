@@ -19,6 +19,7 @@
 #pragma once
 #include <CFXS/RTOS/_Config.hpp>
 #include <CFXS/RTOS/Types.hpp>
+#include <CFXS/Base/Time.hpp>
 
 namespace CFXS::RTOS {
 
@@ -48,18 +49,31 @@ namespace CFXS::RTOS {
         /// Get next thread in linked list
         __always_inline Thread* LL_GetNextThread() const { return m_ll_NextThread; }
 
+        /// Get thread ID
+        __always_inline uint32_t GetID() const { return m_ThreadID; }
+
+        /// Sleep for at least ms milliseconds
+        void Sleep_ms(Time_t ms);
+        /// Sleep for at least us microseconds
+        void Sleep_us(Time_t us);
+
+        __always_inline Time_t GetSleepUntil() const { return m_SleepUntil; }
+
     private:
-        Thread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize);
+        Thread(uint32_t threadID, const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize);
 
         Thread* m_ll_NextThread = nullptr;
+        bool m_Running          = false;
 
+        uint32_t m_ThreadID;
         const char* m_Label;
-        bool m_Running = false;
 
         void* m_ThreadSP;
         ThreadFunction m_ThreadFunction;
         void* m_StackEndAddress;
         size_t m_StackSize;
+
+        Time_t m_SleepUntil = 0;
     };
 
 } // namespace CFXS::RTOS

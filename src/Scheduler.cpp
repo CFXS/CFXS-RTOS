@@ -2,6 +2,7 @@
 #include <CFXS/RTOS/Scheduler.hpp>
 #include <CFXS/Base/Time.hpp>
 #include <CFXS/Base/CPU.hpp>
+#include <CFXS/Base/Debug.hpp>
 
 namespace CFXS::RTOS {
 
@@ -19,8 +20,7 @@ namespace CFXS::RTOS {
 #pragma GCC diagnostic pop
 
     ////////////////////////////////////////////////////////
-    static constexpr auto MAX_THREAD_COUNT = 8;
-    ////////////////////////////////////////////////////////
+    int s_ThreadID                   = 0;
     Thread* volatile s_LastThread    = nullptr;
     Thread* volatile s_CurrentThread = nullptr;
     Thread* volatile s_NextThread    = nullptr;
@@ -28,10 +28,17 @@ namespace CFXS::RTOS {
 
     // Process scheduler event
     void Scheduler::SchedulerEvent() {
-        if (!s_NextThread)
-            s_NextThread = s_LastThread ? s_LastThread->LL_GetNextThread() : nullptr;
-        else
+        Time_t currentTime = CFXS::Time::cycles;
+
+        s_NextThread = s_NextThread->LL_GetNextThread();
+
+        if (s_NextThread->GetID() == 0) {
             s_NextThread = s_NextThread->LL_GetNextThread();
+        }
+
+        while (currentTime < s_NextThread->GetSleepUntil()) {
+            s_NextThread = s_NextThread->LL_GetNextThread();
+        }
 
         if (s_NextThread && s_NextThread != s_CurrentThread) {
             *(size_t volatile*)0xE000ED04 = (1 << 28);
@@ -56,11 +63,28 @@ namespace CFXS::RTOS {
         asm volatile("bx lr");
     }
 
-    // Create new thread
     Thread* Scheduler::CreateThread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize) {
-        auto thread = new Thread(label, func, stackAddr, stackSize);
-
         asm volatile("cpsid i");
+        if (s_ThreadID == 0) {
+            // create idle thread
+            static __attribute__((aligned(8))) uint32_t s_IdleThreadStack[32];
+            s_NextThread = new Thread(
+                s_ThreadID++,
+                "CFXS RTOS Idle Thread",
+                []() {
+                    while (1 < 2) {
+                        asm volatile("wfi");
+                    }
+                },
+                s_IdleThreadStack,
+                sizeof(s_IdleThreadStack));
+
+            s_NextThread->LL_SetNextThread(s_NextThread);
+            s_LastThread = s_NextThread;
+        }
+
+        auto thread = new Thread(s_ThreadID++, label, func, stackAddr, stackSize);
+
         if (!s_LastThread) {
             // Initialize circular linked list
             s_LastThread = thread;
@@ -74,6 +98,10 @@ namespace CFXS::RTOS {
         asm volatile("cpsie i");
 
         return thread;
+    }
+
+    Thread* Scheduler::GetCurrentThread() {
+        return s_CurrentThread; //
     }
 
 } // namespace CFXS::RTOS
