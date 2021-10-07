@@ -16,7 +16,7 @@ namespace CFXS::RTOS {
     void Thread::Sleep_ms(Time_t sleep_for_ms) {
         m_SleepUntil = CFXS::Time::cycles + sleep_for_ms * CPU::CYCLES_PER_MS;
         asm volatile("cpsid i");
-        Scheduler::SchedulerEvent();
+        Scheduler::ProcessThreads();
         asm volatile("cpsie i");
     }
 
@@ -24,7 +24,7 @@ namespace CFXS::RTOS {
     void Thread::Sleep_us(Time_t sleep_for_us) {
         m_SleepUntil = CFXS::Time::cycles + sleep_for_us * CPU::CYCLES_PER_USEC;
         asm volatile("cpsid i");
-        Scheduler::SchedulerEvent();
+        Scheduler::ProcessThreads();
         asm volatile("cpsie i");
     }
 

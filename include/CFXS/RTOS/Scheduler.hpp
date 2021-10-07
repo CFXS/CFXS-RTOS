@@ -6,8 +6,8 @@ namespace CFXS::RTOS {
 
     class Scheduler {
     public:
-        static void ContextEvent();
-        static void SchedulerEvent();
+        static void UpdateContext();
+        static void ProcessThreads();
 
         // Create new thread
         static Thread* CreateThread(const char* label, const ThreadFunction& func, void* stackAddr, size_t stackSize);

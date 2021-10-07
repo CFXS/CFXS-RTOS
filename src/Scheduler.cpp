@@ -27,7 +27,7 @@ namespace CFXS::RTOS {
     ////////////////////////////////////////////////////////
 
     // Process scheduler event
-    void Scheduler::SchedulerEvent() {
+    void Scheduler::ProcessThreads() {
         Time_t currentTime = CFXS::Time::cycles;
 
         s_NextThread = s_NextThread->LL_GetNextThread();
@@ -46,7 +46,7 @@ namespace CFXS::RTOS {
     }
 
     // Process context switch event
-    __naked void Scheduler::ContextEvent() {
+    __naked void Scheduler::UpdateContext() {
         asm volatile("cpsid i");
         if (s_CurrentThread) {
             asm volatile("push {r4-r11}");
